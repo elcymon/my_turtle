@@ -1,0 +1,32 @@
+<launch>
+    <!-- <include file="$(find turtlebot_bringup)/launch/minimal.launch">
+    </include> -->
+    <node pkg="my_turtle" type="my_turtle_spiral.py" name="my_turtle" output="screen" required="true">
+    </node>
+    <node ns="hdg" name="hdg_pid" pkg="pid" type="controller" output="screen" required="true">
+            <param name="Kp" value="10000.0" />
+            <param name="Ki" value="000.0" />
+            <param name="Kd" value="0.0"/>
+            <param name="upper_limit" value="100" />
+            <param name="lower_limit" value="-100" />
+            <param name="windup_limit" value="100" />
+            <param name="angle_error" value="true" />
+            <param name="max_loop_frequency" value="10.0"/>
+            <param name="min_loop_frequency" value="1.0"/>
+            <param name="angle_wrap" value="6.283185307179586" />
+    </node>
+    <!-- <include file="$(find turtlebot_gazebo)/launch/turtlebot_world.launch">
+        <arg name="world_file" value="/home/turtlebot/experiments/catkin_ws/src/turtlebot/w_turtlebot.world"/>
+        <arg name="world_file" value="$(find turtlebot_gazebo)/worlds/empty.world"/>
+    </include> -->
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+        <param name="output_frame" value="odom"/>
+        <param name="freq" value="100.0"/>
+        <param name="sensor_timeout" value="1.0"/>
+        <param name="odom_used" value="true"/>
+        <param name="imu_used" value="true"/>
+        <param name="vo_used" value="false"/>
+        <param name="debug" value="false"/>
+        <param name="self_diagnose" value="false"/>
+    </node>
+</launch>
