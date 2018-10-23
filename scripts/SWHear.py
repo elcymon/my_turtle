@@ -112,13 +112,13 @@ class SWHear():
         """run this after changing settings (like rate) before recording"""
         
         if self.device is None:
-            self.device=self.valid_input_devices()[1] #pick the first one
+            self.device=self.valid_input_devices()[0] #pick the first one
         if self.rate is None:
             self.rate=self.valid_low_rate(self.device)
         self.chunk = int(self.rate/self.updatesPerSecond) # hold one tenth of a second in memory
         if not self.valid_test(self.device,self.rate):
             print("guessing a valid microphone device/rate...")
-            self.device=self.valid_input_devices()[1] #pick the first one
+            self.device=self.valid_input_devices()[0] #pick the first one
             self.rate=self.valid_low_rate(self.device)
         self.datax=np.arange(self.chunk)/float(self.rate)
         msg='recording from "%s" '%self.info["name"]
@@ -184,7 +184,7 @@ if __name__=="__main__":
     f = open(time.strftime('%Y%m%d%H%M%S') + 'SoundRecording.txt','a')
     expDuration = 10
 
-    time.sleep(10)#wait 10 seconds before you start
+    time.sleep(1)#wait 10 seconds before you start
 
     strtTime = time.time()
     
