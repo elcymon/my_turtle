@@ -174,12 +174,37 @@ class SWHear():
         self.stream_thread_new()
 
 if __name__=="__main__":
-    ear=SWHear(updatesPerSecond=10) # optinoally set sample rate here
-    ear.stream_start() #goes forever
-    lastRead=ear.chunksRead
+    hz = 40
+    ear=SWHear(rate=44100,updatesPerSecond=hz)
+    ear.stream_start() 
+    lastRead = ear.chunksRead
+
+    sound_intensity = 0
+    sound_data = []
+    f = open(time.strftime('%Y%m%d%H%M%S') + 'SoundRecording.txt','a')
+    expDuration = 10
+
+    time.sleep(10)#wait 10 seconds before you start
+
+    strtTime = time.time()
+    
     while True:
-        while lastRead==ear.chunksRead:
-            time.sleep(.01)
-        print(ear.chunksRead,len(ear.data))
-        lastRead=ear.chunksRead
+        expTime = time.time() - strtTime
+        while lastRead == ear.chunksRead:#wait for new data to be read based on hz
+            time.sleep(0.001)
+        
+        if not ear.data is None and not ear.fft is None:#If there is data and FFT result
+            lastRead = ear.chunksRead#store number of chunks read
+            sound_intensity = np.mean(ear.fft)#white noise intensity is mean of all FFT spectrum
+            sound_data.append(ear.streamdata)
+            f.write('{},{}'.format(expTime,sound_intensity))
+
+        if expTime > expDuration:
+            ear.close()
+            break
+        
+    f.close()
+
+
+        
     print("DONE")
