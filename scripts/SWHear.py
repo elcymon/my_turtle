@@ -197,7 +197,7 @@ if __name__=="__main__":
             lastRead = ear.chunksRead#store number of chunks read
             sound_intensity = np.mean(ear.fft)#white noise intensity is mean of all FFT spectrum
             sound_data.append(ear.streamdata)
-            f.write('{},{}'.format(expTime,sound_intensity))
+            f.write('{},{}\n'.format(expTime,sound_intensity))
 
         if expTime > expDuration:
             ear.close()
