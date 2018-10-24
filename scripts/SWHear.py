@@ -66,6 +66,7 @@ class SWHear():
         self.chunksRead=0
         self.device=device
         self.rate=rate
+        self.allMics = []
 
     ### SYSTEM TESTS
 
@@ -100,6 +101,8 @@ class SWHear():
         for device in range(self.p.get_device_count()):
             if self.valid_test(device):
                 mics.append(device)
+                micInfo = self.p.get_device_info_by_index(device)
+                self.allMics.append([device,micInfo["name"]])
         if len(mics)==0:
             print("no microphone devices found!")
         else:
@@ -110,15 +113,15 @@ class SWHear():
 
     def initiate(self):
         """run this after changing settings (like rate) before recording"""
-        
+        device = 2
         if self.device is None:
-            self.device=self.valid_input_devices()[0] #pick the first one
+            self.device=self.valid_input_devices()[device] #pick the first one
         if self.rate is None:
             self.rate=self.valid_low_rate(self.device)
         self.chunk = int(self.rate/self.updatesPerSecond) # hold one tenth of a second in memory
         if not self.valid_test(self.device,self.rate):
             print("guessing a valid microphone device/rate...")
-            self.device=self.valid_input_devices()[0] #pick the first one
+            self.device=self.valid_input_devices()[device] #pick the first one
             self.rate=self.valid_low_rate(self.device)
         self.datax=np.arange(self.chunk)/float(self.rate)
         msg='recording from "%s" '%self.info["name"]
@@ -187,7 +190,9 @@ if __name__=="__main__":
     time.sleep(1)#wait 10 seconds before you start
 
     strtTime = time.time()
-    
+    for mic in ear.allMics:
+        print('{}\t{}'.format(mic[0],mic[1]))
+
     while True:
         expTime = time.time() - strtTime
         while lastRead == ear.chunksRead:#wait for new data to be read based on hz
