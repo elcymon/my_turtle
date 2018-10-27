@@ -111,9 +111,9 @@ class SWHear():
 
     ### SETUP AND SHUTDOWN
 
-    def initiate(self):
+    def initiate(self,device):
         """run this after changing settings (like rate) before recording"""
-        device = 2
+        #device = 2
         if self.device is None:
             self.device=self.valid_input_devices()[device] #pick the first one
         if self.rate is None:
@@ -163,9 +163,9 @@ class SWHear():
         self.t=threading.Thread(target=self.stream_readchunk)
         self.t.start()
 
-    def stream_start(self):
+    def stream_start(self,device):
         """adds data to self.data until termination signal"""
-        self.initiate()
+        self.initiate(device)
         print(" -- starting stream")
         self.keepRecording=True # set this to False later to terminate stream
         self.data=None # will fill up with threaded recording data
@@ -178,20 +178,25 @@ class SWHear():
 
 if __name__=="__main__":
     hz = 40
+    
+##    for i in range(14):
+##    print('{} of {}'.format(i,len(range(10))))
+    i = 0
     ear=SWHear(rate=44100,updatesPerSecond=hz)
-    ear.stream_start() 
+
+    ear.stream_start(i) 
     lastRead = ear.chunksRead
 
     sound_intensity = 0
     sound_data = []
-    f = open(time.strftime('%Y%m%d%H%M%S') + 'SoundRecording.txt','a')
+    f = open(time.strftime('%Y%m%d%H%M%S-')+ear.info["name"] + '-SoundRecording-omniMic.txt','a')
     expDuration = 10
 
-    time.sleep(1)#wait 10 seconds before you start
+    #time.sleep(1)#wait 10 seconds before you start
 
     strtTime = time.time()
-    for mic in ear.allMics:
-        print('{}\t{}'.format(mic[0],mic[1]))
+    #for mic in ear.allMics:
+     #   print('{}\t{}'.format(mic[0],mic[1]))
 
     while True:
         expTime = time.time() - strtTime
