@@ -16,16 +16,15 @@ from virtual_wall import virtual_wall
 
 wall = virtual_wall(2,2,False)
 
-hz = 10
+hz = 40
 ear = SWHear.SWHear(rate=44100,updatesPerSecond=hz)
-ear.stream_start()
 freq = 500
 
 linear_vel = 0.1
 angular_vel = 0.1
 
 yaw = 0
-base_prob = 1.0/(hz*50)
+base_prob = 1.0/(hz*10)
 mu = math.pi
 sigma = math.pi/2.0
 tolerance = 3 * math.pi / 180
@@ -33,6 +32,7 @@ tolerance = 3 * math.pi / 180
 new_heading = 'NaN'
 turn_amt = 0
 turn = False
+reverseBool = False
 bumper = BumperEvent()
 avoid_obstacle = False
 
@@ -44,7 +44,7 @@ hdg_scale = angular_vel/100.0 #max_rot_vel/max_ctrl_effort
 goal = Point()
 pose = Point()
 # pose = Odometry()
-log_filename = '/home/turtlebot/experiments/catkin_ws/my_turtle/'+time.strftime('%Y%m%d%H%M%S') + 'data.txt'
+log_filename = '/home/turtlebot/catkin_ws/src/my_turtle/results/'+time.strftime('%Y%m%d%H%M%S') + 'data.txt'
 
 def callback_imu(data):
     global yaw,drd_heading,start
@@ -88,9 +88,35 @@ def callback_log(data):
     # a = 5#do not write anything
     with open(log_filename,'a') as f:
         f.write(data.data+'\n')
-def explore():
+def computeGrad(prev_sound):
+    ''' reads the sound signal from microphone and update the robot's turning probability
+    returns the new turning probability and the sound intensity measured'''
+    sound_intensity = prev_sound #assume there is not change in intensity
+    turn_prob = base_prob
+
+    if not ear.data is None and not ear.fft is None:
+            aa = ear.fft
+            
+            sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
+            
+    if prev_sound > sound_intensity:
+        #increase turn probability to change orientation
+        turn_prob *= 10
+    elif prev_sound < sound_intensity:
+        #reduce turn probability to maintain orientation
+        turn_prob /= 10
+    else:
+        #leave turn probability as is
+        turn_prob *= 1
+    
+    return turn_prob,sound_intensity
+    
+def explore(hear=True):
     global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal
     global ear
+
+    if hear:
+        ear.stream_start()
 
     pub = rospy.Publisher('mobile_base/commands/velocity', Twist,queue_size=1)
     pub_hdg_setpoint = rospy.Publisher('/hdg/setpoint',Float64,queue_size=1)
@@ -105,17 +131,24 @@ def explore():
     pub_log = rospy.Publisher('/my_turtle/log',String,queue_size=1)
     pub_bump = rospy.Publisher('/my_turtle/bump_info',String,queue_size = 1)
     sub_log = rospy.Subscriber('/my_turtle/log',String,callback_log,queue_size=1)
-    rate = rospy.Rate(hz)
+    
+    rate = rospy.Rate(hz) #looping rate
+    
     straight = Twist()
+    straight.angular.z = 0
     straight.linear.x = linear_vel
+
+    reverse = Twist()
+    reverse.angular.z = 0
+    reverse.linear.x = -linear_vel
     
     turn_left = Twist()
     turn_left.angular.z = angular_vel
-    turn_left.linear.x = 0#-linear_vel/10.0
+    turn_left.linear.x = 0
     
     turn_right = Twist()
     turn_right.angular.z = -angular_vel
-    turn_right.linear.x = 0#-linear_vel/10.0
+    turn_right.linear.x = 0
     
     stop = Twist()
     stop.angular.z = 0
@@ -129,29 +162,15 @@ def explore():
     time.sleep(15)
     t = rospy.Time.now().to_sec()
     first_sound = True
+    revStart = None # for holding location reverse motion started
+    revD = 0.05 #  reversing distance
+
     while not rospy.is_shutdown():# and x < 10 * 60 * 4
-        turn_prob = base_prob
-        if not ear.data is None and not ear.fft is None:
-            aa = ear.fft#[ear.fftx>(freq - 10)]
-            # ww = ear.fftx[(ear.fftx>(freq-10))]
-            # aa = aa[ww<(freq+10)]
-            # ww = ww[ww<(freq+10)]
-            sound_intensity = np.mean(aa)#aa[ww==500.]#
-            # sound_intensity = sound_intensity[0]
-            if first_sound:
-                prev_sound = sound_intensity
-                first_sound = False
-        if prev_sound > sound_intensity:
-            #increase turn probability to change orientation
-            turn_prob *= 10
-        elif prev_sound < sound_intensity:
-            #reduce turn probability to maintain orientation
-            turn_prob /= 10
+        if hear:
+            turn_prob,prev_sound = computeGrad(prev_sound)
         else:
-            #leave turn probability as is
-            turn_prob *= 1
-        # print sound_intensity
-        prev_sound = sound_intensity
+            turn_prob = base_prob
+        
         x +=1
         bound_check = 3
         if not turn:
@@ -171,6 +190,7 @@ def explore():
 
             # print bound_check,avoid_obstacle,pose.x,pose.y,y
         if bound_check != 3 and avoid_obstacle and not turn:
+            #boundary obstacle avoidance behaviour
             if bound_check == 0: #left obstacle
                 temp_heading = yaw - math.pi/4.0
             elif bound_check == 2: #right obstacle
@@ -181,11 +201,19 @@ def explore():
             new_heading = angles.normalize_angle(temp_heading) #% 360
             turn_amt = angles.shortest_angular_distance(yaw,new_heading)# (new_heading - yaw) % 360
             turn = True
+            reverseBool = True
+            revStart = pose
             avoid_obstacle = False
         
         # drd_heading = goal_direction(goal,pose)#when going to a goal location
 
-        if turn:
+        if reverseBool and revStart != None:
+            #reverse for at lease revD distance before turning
+            pub.publish(reverse)
+            if goal_distance(revStart,pose) >= revD:
+                revStart = None
+                reverseBool = False
+        elif turn:
             drd_heading = new_heading
             t_amt = angles.shortest_angular_distance(yaw,new_heading)
             if turn_amt < 0:
@@ -233,6 +261,6 @@ def explore():
 if __name__=="__main__":
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
-        explore()
+        explore(hear=False)
     except rospy.ROSInterruptException:
         pass
