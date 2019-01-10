@@ -14,7 +14,7 @@ import time
 import numpy as np
 from virtual_wall import virtual_wall
 
-wall = virtual_wall(2,2,False)
+wall = virtual_wall(2,2,True)
 
 hz = 40
 ear = SWHear.SWHear(rate=44100,updatesPerSecond=hz)
@@ -35,6 +35,7 @@ turn = False
 reverseBool = False
 bumper = BumperEvent()
 avoid_obstacle = False
+bumper_event = False # update bound_check to initiate obstacle avoidance
 
 drd_heading = 0
 start = True
@@ -43,6 +44,11 @@ hdg_scale = angular_vel/100.0 #max_rot_vel/max_ctrl_effort
 
 goal = Point()
 pose = Point()
+home = Point()
+home.x = 0
+home.y = 0
+home.z = 0
+
 # pose = Odometry()
 log_filename = '/home/turtlebot/catkin_ws/src/my_turtle/results/'+time.strftime('%Y%m%d%H%M%S') + 'data.txt'
 
@@ -59,11 +65,11 @@ def callback_imu(data):
         start = False
         drd_heading = yaw
 def callback_bumper(data):
-    global bumper, avoid_obstacle
+    global bumper, bumper_event
     bumper = BumperEvent()
     bumper = data
     if bumper.state == 1 and not turn:
-        avoid_obstacle = True
+        bumper_event = True
 
 def callback_hdg_pid(data):
     global hdg_ctrl_effort
@@ -112,8 +118,9 @@ def computeGrad(prev_sound):
     return turn_prob,sound_intensity
     
 def explore(hear=True):
-    global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal
+    global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal,bumper_event
     global ear
+    global reverseBool,revStart
 
     if hear:
         ear.stream_start()
@@ -163,9 +170,12 @@ def explore(hear=True):
     t = rospy.Time.now().to_sec()
     first_sound = True
     revStart = None # for holding location reverse motion started
-    revD = 0.05 #  reversing distance
-
+    revD = 0.1 #  reversing distance
+    expDuration = 100
+    
     while not rospy.is_shutdown():# and x < 10 * 60 * 4
+        goal_d = np.Inf # initially set goal distance to be infinite to prevent stopping
+
         if hear:
             turn_prob,prev_sound = computeGrad(prev_sound)
         else:
@@ -175,18 +185,32 @@ def explore(hear=True):
         bound_check = 3
         if not turn:
             (bound_check,avoid_obstacle,bumpside,bumpyaw) = wall.bumper_event(pose,yaw)
+            if bumper_event:
+                avoid_obstacle = bumper_event
+                bound_check = bumper.bumper
+                bumper_event = False
+
             pub_bump.publish('bumper={},avoid={},{},({},{},{})'.format(bound_check,avoid_obstacle,bumpside,pose.x,pose.y,bumpyaw))
-            
-            
-        if random.random() < turn_prob and not turn and not avoid_obstacle:
+        # if endExperiment:
+        #     print 'end experiment' 
+        if rospy.Time.now().to_sec()-t >= expDuration and not avoid_obstacle and not turn:
+            # Experiment duration reached. Go home.
+            new_heading = goal_direction(home,pose)#when going to a goal location
+            goal_d = goal_distance(home,pose)
+            t_amt = angles.shortest_angular_distance(yaw,new_heading)
+
+            if abs(t_amt) > tolerance:
+                turn = True
+        elif random.random() < turn_prob and not turn and not avoid_obstacle:
+            # perform random walk
             turn = True
             temp_heading = yaw + random.gauss(mu,sigma)
             new_heading = angles.normalize_angle(temp_heading) #% 360
-            turn_amt = angles.shortest_angular_distance(yaw,new_heading)# (new_heading - yaw) % 360
-        if avoid_obstacle or True:
-            y = yaw / angles.pi * 180
-            if y < 0:
-                y = y + 360
+            # turn_amt = angles.shortest_angular_distance(yaw,new_heading)# (new_heading - yaw) % 360
+        # if avoid_obstacle or True:
+        #     y = yaw / angles.pi * 180
+        #     if y < 0:
+        #         y = y + 360
 
             # print bound_check,avoid_obstacle,pose.x,pose.y,y
         if bound_check != 3 and avoid_obstacle and not turn:
@@ -216,7 +240,7 @@ def explore(hear=True):
         elif turn:
             drd_heading = new_heading
             t_amt = angles.shortest_angular_distance(yaw,new_heading)
-            if turn_amt < 0:
+            if t_amt < 0:
                 pub.publish(turn_right)
                 # print 'tr',yaw,new_heading,turn_amt
             else:
@@ -229,11 +253,14 @@ def explore(hear=True):
             # goal_d = goal_distance(goal,pose)
             # rospy.loginfo("goal_d = %.2f, x = %.2f, y = %.2f, intensity = %.2f",goal_d,pose.x,pose.y,sound_intensity)
             # print rospy.Time.now().to_sec()
-            # if goal_d < 0.1:
-            #     straight.linear.x = 0
-            #     straight.angular.z = 0
-            # else:
-            rot_vel = hdg_ctrl_effort * hdg_scale
+            if goal_d < 0.1:
+                #stop if goal (i.e. home in go home behaviour) is reached
+                straight.linear.x = 0
+                rot_vel = 0
+                break
+            else:
+                rot_vel = hdg_ctrl_effort * hdg_scale
+            
             if rot_vel > angular_vel: rot_vel = angular_vel
             if rot_vel < -angular_vel: rot_vel = -angular_vel
 
