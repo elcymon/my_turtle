@@ -1,0 +1,8 @@
+#ignore some files
+*/.vscode/
+
+*/*.pyc
+*.wav
+results/*
+
+!.placeholder

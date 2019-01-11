@@ -1,5 +1,0 @@
-#ignore some files
-.vscode/
-results/
-*.pyc
-*.wav
