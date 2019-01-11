@@ -25,6 +25,10 @@ angular_vel = 0.1
 
 yaw = 0
 base_prob = 1.0/(hz*10)
+prob_multiplier = 10 # probability multiplier
+sound_intensity_list = [] # list of sound intensity readings
+qSize = 40 # size of queue before updating sound intensity values (size of queue for average filter)
+
 mu = math.pi
 sigma = math.pi/2.0
 tolerance = 3 * math.pi / 180
@@ -94,28 +98,30 @@ def callback_log(data):
     # a = 5#do not write anything
     with open(log_filename,'a') as f:
         f.write(data.data+'\n')
-def computeGrad(prev_sound):
+def computeGrad(prev_sound,turn_prob):
     ''' reads the sound signal from microphone and update the robot's turning probability
     returns the new turning probability and the sound intensity measured'''
-    sound_intensity = prev_sound #assume there is not change in intensity
-    turn_prob = base_prob
-
+    global qSize, sound_intensity_list, prob_multiplier
+    
     if not ear.data is None and not ear.fft is None:
             aa = ear.fft
             
             sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
-            
-    if prev_sound > sound_intensity:
-        #increase turn probability to change orientation
-        turn_prob *= 10
-    elif prev_sound < sound_intensity:
-        #reduce turn probability to maintain orientation
-        turn_prob /= 10
-    else:
-        #leave turn probability as is
-        turn_prob *= 1
+            sound_intensity_list.append(sound_intensity)
+    if len(sound_intensity_list) >= qSize:        
+        if prev_sound > np.mean(sound_intensity_list):
+            #increase turn probability to change orientation
+            turn_prob = base_prob * prob_multiplier
+        elif prev_sound < np.mean(sound_intensity_list):
+            #reduce turn probability to maintain orientation
+            turn_prob = base_prob / prob_multiplier
+        else:
+            #leave turn probability as is
+            turn_prob = turn_prob
+        
+        prev_sound = np.mean(sound_intensity_list) # update sound intensity value
     
-    return turn_prob,sound_intensity
+    return turn_prob,prev_sound
     
 def explore(hear=True):
     global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal,bumper_event
@@ -166,18 +172,18 @@ def explore(hear=True):
     # goal.y = 0
     sound_intensity = 0
     prev_sound = 0
-    time.sleep(15)
     t = rospy.Time.now().to_sec()
     first_sound = True
     revStart = None # for holding location reverse motion started
     revD = 0.1 #  reversing distance
-    expDuration = 100
-    
+    expDuration = 200
+    turn_prob = base_prob # initial turn_prob is same as base_prob
+
     while not rospy.is_shutdown():# and x < 10 * 60 * 4
         goal_d = np.Inf # initially set goal distance to be infinite to prevent stopping
 
         if hear:
-            turn_prob,prev_sound = computeGrad(prev_sound)
+            turn_prob,prev_sound = computeGrad(prev_sound,turn_prob)#last values of soundIntensity and turn_prob
         else:
             turn_prob = base_prob
         
@@ -195,7 +201,12 @@ def explore(hear=True):
         #     print 'end experiment' 
         if rospy.Time.now().to_sec()-t >= expDuration and not avoid_obstacle and not turn:
             # Experiment duration reached. Go home.
-            new_heading = goal_direction(home,pose)#when going to a goal location
+            if hear:
+                ear.close()
+            goal_dx = goal_direction(home,pose)
+            new_heading = goal_dx if goal_dx > 0 else 2 * math.pi + goal_dx#when going to a goal location
+            
+            new_heading = angles.normalize_angle(new_heading)
             goal_d = goal_distance(home,pose)
             t_amt = angles.shortest_angular_distance(yaw,new_heading)
 
@@ -269,7 +280,7 @@ def explore(hear=True):
             #     straight = stop
             pub.publish(straight)
 
-        log = '{},{},{},{},{},{}'.format(rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,sound_intensity,turn_prob)
+        log = '{},{},{},{},{},{}'.format(rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,turn_prob)
         pub_log.publish(log)
             # print 'straight',yaw,drd_heading,rot_vel
         set_p = drd_heading
@@ -286,6 +297,8 @@ def explore(hear=True):
     print("Quitting")
 
 if __name__=="__main__":
+    time.sleep(15)
+    
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
         explore(hear=False)
