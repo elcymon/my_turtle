@@ -14,24 +14,26 @@ import time
 import numpy as np
 from virtual_wall import virtual_wall
 
-wall = virtual_wall(2,2,True)
+wall = virtual_wall(10,4,True)
 
 hz = 40
 ear = SWHear.SWHear(rate=44100,updatesPerSecond=hz)
 freq = 500
 
 linear_vel = 0.1
-angular_vel = 0.1
+angular_vel = 1.77/2
 
 yaw = 0
 base_prob = 1.0/(hz*10)
 prob_multiplier = 10 # probability multiplier
 sound_intensity_list = [] # list of sound intensity readings
 qSize = 40 # size of queue before updating sound intensity values (size of queue for average filter)
+expDuration = 1000
+new_comm_signal = False
 
 mu = math.pi
 sigma = math.pi/2.0
-tolerance = 3 * math.pi / 180
+tolerance = 5 * math.pi / 180
 
 new_heading = 'NaN'
 turn_amt = 0
@@ -44,7 +46,7 @@ bumper_event = False # update bound_check to initiate obstacle avoidance
 drd_heading = 0
 start = True
 hdg_ctrl_effort = 0
-hdg_scale = angular_vel/100.0 #max_rot_vel/max_ctrl_effort
+hdg_scale = angular_vel/1000.0 #max_rot_vel/max_ctrl_effort
 
 goal = Point()
 pose = Point()
@@ -98,30 +100,44 @@ def callback_log(data):
     # a = 5#do not write anything
     with open(log_filename,'a') as f:
         f.write(data.data+'\n')
-def computeGrad(prev_sound,turn_prob):
+def computeGrad(turn_prob,prev_sound,curr_sound,turn):
     ''' reads the sound signal from microphone and update the robot's turning probability
     returns the new turning probability and the sound intensity measured'''
-    global qSize, sound_intensity_list, prob_multiplier
+    global qSize, sound_intensity_list, prob_multiplier,new_comm_signal
     
     if not ear.data is None and not ear.fft is None:
             aa = ear.fft
             
             sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
             sound_intensity_list.append(sound_intensity)
-    if len(sound_intensity_list) >= qSize:        
-        if prev_sound > np.mean(sound_intensity_list):
-            #increase turn probability to change orientation
-            turn_prob = base_prob * prob_multiplier
-        elif prev_sound < np.mean(sound_intensity_list):
+            # print(sound_intensity)
+
+    if len(sound_intensity_list) >= qSize:
+        curr_sound = np.mean(sound_intensity_list)
+        new_comm_signal = True
+        # l1 = len(sound_intensity_list)
+        sound_intensity_list = []
+        # print(l1,len(sound_intensity_list))
+    # print(prev_sound,curr_sound,turn_prob)
+        
+        
+    
+    if not turn and new_comm_signal:
+        new_comm_signal = False
+        turn_prob = base_prob
+        if prev_sound > curr_sound:
+                #increase turn probability to change orientation
+            turn_prob = base_prob# * prob_multiplier
+        elif prev_sound < curr_sound:
             #reduce turn probability to maintain orientation
-            turn_prob = base_prob / prob_multiplier
+            turn_prob = base_prob /(10* prob_multiplier)
         else:
             #leave turn probability as is
             turn_prob = turn_prob
-        
-        prev_sound = np.mean(sound_intensity_list) # update sound intensity value
+        prev_sound = curr_sound # update sound intensity value
     
-    return turn_prob,prev_sound
+    
+    return turn_prob,prev_sound,curr_sound
     
 def explore(hear=True):
     global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal,bumper_event
@@ -172,18 +188,20 @@ def explore(hear=True):
     # goal.y = 0
     sound_intensity = 0
     prev_sound = 0
+    curr_sound = 0
+
     t = rospy.Time.now().to_sec()
     first_sound = True
     revStart = None # for holding location reverse motion started
     revD = 0.1 #  reversing distance
-    expDuration = 200
     turn_prob = base_prob # initial turn_prob is same as base_prob
 
     while not rospy.is_shutdown():# and x < 10 * 60 * 4
         goal_d = np.Inf # initially set goal distance to be infinite to prevent stopping
 
         if hear:
-            turn_prob,prev_sound = computeGrad(prev_sound,turn_prob)#last values of soundIntensity and turn_prob
+            turn_prob,prev_sound,curr_sound = computeGrad(turn_prob,prev_sound,curr_sound,turn)#last values of soundIntensity and turn_prob
+            
         else:
             turn_prob = base_prob
         
@@ -241,14 +259,16 @@ def explore(hear=True):
             avoid_obstacle = False
         
         # drd_heading = goal_direction(goal,pose)#when going to a goal location
-
+        acTion = 'straight'
         if reverseBool and revStart != None:
+            acTion = 'reverse'
             #reverse for at lease revD distance before turning
             pub.publish(reverse)
             if goal_distance(revStart,pose) >= revD:
                 revStart = None
                 reverseBool = False
         elif turn:
+            acTion = 'turning'
             drd_heading = new_heading
             t_amt = angles.shortest_angular_distance(yaw,new_heading)
             if t_amt < 0:
@@ -265,6 +285,7 @@ def explore(hear=True):
             # rospy.loginfo("goal_d = %.2f, x = %.2f, y = %.2f, intensity = %.2f",goal_d,pose.x,pose.y,sound_intensity)
             # print rospy.Time.now().to_sec()
             if goal_d < 0.1:
+                acTion = 'stop'
                 #stop if goal (i.e. home in go home behaviour) is reached
                 straight.linear.x = 0
                 rot_vel = 0
@@ -279,9 +300,9 @@ def explore(hear=True):
             # if avoid_obstacle:
             #     straight = stop
             pub.publish(straight)
-
-        log = '{},{},{},{},{},{}'.format(rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,turn_prob)
-        pub_log.publish(log)
+        if rospy.Time.now().to_sec()-t <= expDuration:
+            log = '{},{},{},{},{},{},{},{}'.format(rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,curr_sound,turn_prob,acTion)
+            pub_log.publish(log)
             # print 'straight',yaw,drd_heading,rot_vel
         set_p = drd_heading
         state_p = yaw
@@ -301,6 +322,6 @@ if __name__=="__main__":
     
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
-        explore(hear=False)
+        explore(hear=True)
     except rospy.ROSInterruptException:
         pass
