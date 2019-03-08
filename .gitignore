@@ -5,4 +5,5 @@
 *.wav
 results/*
 
+*.zip
 !.placeholder

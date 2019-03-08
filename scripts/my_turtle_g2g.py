@@ -43,7 +43,7 @@ hdg_scale = angular_vel/100.0 #max_rot_vel/max_ctrl_effort
 goal = Point()
 pose = Point()
 # pose = Odometry()
-log_filename = '/home/turtlebot/experiments/catkin_ws/my_turtle/'+time.strftime('%Y%m%d%H%M%S') + 'data.txt'
+log_filename = '/home/turtlebot/catkin_ws/src/my_turtle/results/'+time.strftime('%Y%m%d%H%M%S') + 'data.txt'
 sound_data_filename = '/home/turtlebot/experiments/catkin_ws/my_turtle/'+time.strftime('%Y%m%d%H%M%S') +'file.wav'
 def callback_imu(data):
     global yaw,drd_heading,start

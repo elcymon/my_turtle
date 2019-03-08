@@ -14,7 +14,7 @@ import time
 import numpy as np
 from virtual_wall import virtual_wall
 
-wall = virtual_wall(200,50,True)
+wall = virtual_wall(5,3,True)
 
 hz = 40
 ear = SWHear.SWHear(rate=44100,updatesPerSecond=hz)
@@ -25,8 +25,7 @@ angular_vel = 1.77/2
 
 yaw = 0
 base_prob = 1.0/(hz*10)
-prob_multiplier = 8 # probability multiplier
-prob_divisor = 100
+prob_multiplier = 10 # probability multiplier
 sound_intensity_list = [] # list of sound intensity readings
 qSize = 40 # size of queue before updating sound intensity values (size of queue for average filter)
 expDuration = 1000
@@ -54,7 +53,7 @@ pose = Point()
 home = Point()
 home.x = 0
 home.y = 0
-home.z = 0
+OHhome.z = 0
 
 # pose = Odometry()
 log_filename = '/home/turtlebot/catkin_ws/src/my_turtle/results/'+time.strftime('%Y%m%d%H%M%S') + 'data.txt'
@@ -110,7 +109,6 @@ def computeGrad(turn_prob,prev_sound,curr_sound,turn):
             aa = ear.fft
             
             sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
-            #if sound_intensity < 300:
             sound_intensity_list.append(sound_intensity)
             # print(sound_intensity)
 
@@ -132,7 +130,7 @@ def computeGrad(turn_prob,prev_sound,curr_sound,turn):
             turn_prob = base_prob * prob_multiplier
         elif prev_sound < curr_sound:
             #reduce turn probability to maintain orientation
-            turn_prob = base_prob / prob_divisor
+            turn_prob = base_prob /prob_multiplier
         else:
             #leave turn probability as is
             turn_prob = turn_prob
@@ -141,7 +139,7 @@ def computeGrad(turn_prob,prev_sound,curr_sound,turn):
     
     return turn_prob,prev_sound,curr_sound
     
-def explore(hear=True,theta_A = 160):
+def explore(hear=True):
     global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal,bumper_event
     global ear
     global reverseBool,revStart
@@ -195,10 +193,9 @@ def explore(hear=True,theta_A = 160):
     t = rospy.Time.now().to_sec()
     first_sound = True
     revStart = None # for holding location reverse motion started
-    revD = 0.05 #  reversing distance
+    revD = 0.1 #  reversing distance
     turn_prob = base_prob # initial turn_prob is same as base_prob
-    logheader = 't,ros_t,x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
-    pub_log.publish(logheader)
+
     while not rospy.is_shutdown():# and x < 10 * 60 * 4
         goal_d = np.Inf # initially set goal distance to be infinite to prevent stopping
 
@@ -206,10 +203,6 @@ def explore(hear=True,theta_A = 160):
             turn_prob,prev_sound,curr_sound = computeGrad(turn_prob,prev_sound,curr_sound,turn)#last values of soundIntensity and turn_prob
             
         else:
-            turn_prob = base_prob
-        
-        #chemotaxis should only be activated when sound intensity is below a threshold
-        if curr_sound > theta_A:
             turn_prob = base_prob
         
         x +=1
@@ -308,7 +301,7 @@ def explore(hear=True,theta_A = 160):
             #     straight = stop
             pub.publish(straight)
         if rospy.Time.now().to_sec()-t <= expDuration:
-            log = '{},{},{},{},{},{},{},{},{}'.format(time.time(),rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,curr_sound,turn_prob,acTion)
+            log = '{},{},{},{},{},{},{},{}'.format(rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,curr_sound,turn_prob,acTion)
             pub_log.publish(log)
             # print 'straight',yaw,drd_heading,rot_vel
         set_p = drd_heading
@@ -325,10 +318,10 @@ def explore(hear=True,theta_A = 160):
     print("Quitting")
 
 if __name__=="__main__":
-    time.sleep(10)
+    time.sleep(15)
     
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
-        explore(hear=True,theta_A=900)
+        explore(hear=True)
     except rospy.ROSInterruptException:
         pass
