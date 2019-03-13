@@ -25,11 +25,11 @@ angular_vel = 1.77/2
 
 yaw = 0
 base_prob = 1.0/(hz*10)
-prob_multiplier = 8 # probability multiplier
-prob_divisor = 100
+prob_multiplier = 6 # probability multiplier
+prob_divisor = 1000
 sound_intensity_list = [] # list of sound intensity readings
 qSize = 40 # size of queue before updating sound intensity values (size of queue for average filter)
-expDuration = 1000
+expDuration = 600
 new_comm_signal = False
 
 mu = math.pi
@@ -212,6 +212,9 @@ def explore(hear=True,theta_A = 160):
         if curr_sound > theta_A:
             turn_prob = base_prob
         
+        if curr_sound < theta_A:
+            print(rospy.Time.now().to_sec()-t,'taxis. curr_sound = ',curr_sound,' theta_A = ',theta_A)
+        
         x +=1
         bound_check = 3
         if not turn:
@@ -224,13 +227,18 @@ def explore(hear=True,theta_A = 160):
             pub_bump.publish('bumper={},avoid={},{},({},{},{})'.format(bound_check,avoid_obstacle,bumpside,pose.x,pose.y,bumpyaw))
         # if endExperiment:
         #     print 'end experiment' 
-        if rospy.Time.now().to_sec()-t >= expDuration and not avoid_obstacle and not turn:
+        if rospy.Time.now().to_sec()-t >= expDuration:# and not avoid_obstacle and not turn and False:#not time limited for now
             # Experiment duration reached. Go home.
             if hear:
                 ear.close()
             goal_dx = goal_direction(home,pose)
             new_heading = goal_dx if goal_dx > 0 else 2 * math.pi + goal_dx#when going to a goal location
             
+            
+            #####
+            #experiment duration reached exit loop
+            #####
+            break
             new_heading = angles.normalize_angle(new_heading)
             goal_d = goal_distance(home,pose)
             t_amt = angles.shortest_angular_distance(yaw,new_heading)
@@ -240,7 +248,7 @@ def explore(hear=True,theta_A = 160):
         elif random.random() < turn_prob and not turn and not avoid_obstacle:
             # perform random walk
             turn = True
-            temp_heading = yaw + random.gauss(mu,sigma)
+            temp_heading = yaw + angles.normalize_angle(random.gauss(mu,sigma))
             new_heading = angles.normalize_angle(temp_heading) #% 360
             # turn_amt = angles.shortest_angular_distance(yaw,new_heading)# (new_heading - yaw) % 360
         # if avoid_obstacle or True:
@@ -329,6 +337,6 @@ if __name__=="__main__":
     
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
-        explore(hear=True,theta_A=900)
+        explore(hear=True,theta_A=190)
     except rospy.ROSInterruptException:
         pass
