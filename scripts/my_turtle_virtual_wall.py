@@ -8,28 +8,46 @@ from sensor_msgs.msg import Imu
 from kobuki_msgs.msg import BumperEvent
 from tf.transformations import euler_from_quaternion
 import random
+
 import math
 import SWHear
 import time
 import numpy as np
 from virtual_wall import virtual_wall
 
+#detour to measure wifi quality
+from subprocess import Popen,PIPE
+mt = 0
+mv = 0
+def get_quality():
+    global mt,mv
+    shell_cmd = 'iwconfig {} | grep Link'.format('wlan0')
+    proc = Popen(shell_cmd,shell=True,stdout=PIPE,stderr=PIPE)
+    output,err = proc.communicate()
+    msg = output.decode('utf-8').strip()
+    m = msg.split('=')[-1]
+    mt = float(m.split(' ')[0])
+    if mt < 0:
+        mv = mt
+
+    return mv
+
 wall = virtual_wall(200,50,True)
 
 hz = 40
 ear = SWHear.SWHear(rate=44100,updatesPerSecond=hz)
 freq = 500
-
+random.seed(int(time.time()))#set random seed to current time
 linear_vel = 0.1
 angular_vel = 1.77/2
 
 yaw = 0
-base_prob = 1.0/(hz*10)
+base_prob = 0# 1.0/(hz*10)
 prob_multiplier = 6 # probability multiplier
 prob_divisor = 1000
 sound_intensity_list = [] # list of sound intensity readings
-qSize = 40 # size of queue before updating sound intensity values (size of queue for average filter)
-expDuration = 600
+qSize = 1 # size of queue before updating sound intensity values (size of queue for average filter)
+expDuration = 2000
 new_comm_signal = False
 
 mu = math.pi
@@ -105,30 +123,44 @@ def computeGrad(turn_prob,prev_sound,curr_sound,turn):
     ''' reads the sound signal from microphone and update the robot's turning probability
     returns the new turning probability and the sound intensity measured'''
     global qSize, sound_intensity_list, prob_multiplier,new_comm_signal
-    
-    if not ear.data is None and not ear.fft is None:
-            aa = ear.fft
-            
-            sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
-            #if sound_intensity < 300:
-            sound_intensity_list.append(sound_intensity)
-            # print(sound_intensity)
 
+    if not ear.data is None and not ear.fft is None:
+        aa = ear.fft
+
+        sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
+        #if sound_intensity < 300:
+        sound_intensity_list.append(sound_intensity)
+        # print(sound_intensity)
+
+    # sound_intensity_list.append(get_quality())
+    if turn and False:
+		sound_intensity_list = []
+		turn_prob = base_prob
+		new_comm_signal = False
+	
+    if len(sound_intensity_list) > 2*qSize and False:
+        sound_intensity_list.pop(0)
     if len(sound_intensity_list) >= qSize:
-        curr_sound = np.mean(sound_intensity_list)
+        #sSize = int(len(sound_intensity_list)/2) # get half of sample length
+        #curr_sound = np.mean(sound_intensity_list[sSize:])
+        #prev_sound = np.mean(sound_intensity_list[:sSize])
         new_comm_signal = True
+        curr_sound = np.mean(sound_intensity_list)
         # l1 = len(sound_intensity_list)
         sound_intensity_list = []
         # print(l1,len(sound_intensity_list))
     # print(prev_sound,curr_sound,turn_prob)
+
+
+    if turn and False:
+        #after turning, I think the turn probability should be reset
+        turn_prob = base_prob
         
-        
-    
     if not turn and new_comm_signal:
         new_comm_signal = False
         turn_prob = base_prob
         if prev_sound > curr_sound:
-                #increase turn probability to change orientation
+            #increase turn probability to change orientation
             turn_prob = base_prob * prob_multiplier
         elif prev_sound < curr_sound:
             #reduce turn probability to maintain orientation
@@ -137,11 +169,12 @@ def computeGrad(turn_prob,prev_sound,curr_sound,turn):
             #leave turn probability as is
             turn_prob = turn_prob
         prev_sound = curr_sound # update sound intensity value
-    
-    
+
+    #curr_sound = sound_intensity
+
     return turn_prob,prev_sound,curr_sound
     
-def explore(hear=True,theta_A = 160):
+def explore(hear=True,theta_A = 1160):
     global turn,new_heading,turn_amt,avoid_obstacle,drd_heading,goal,bumper_event
     global ear
     global reverseBool,revStart
@@ -186,8 +219,8 @@ def explore(hear=True,theta_A = 160):
     stop.linear.x = 0
     x = 0
 
-    # goal.x = 3
-    # goal.y = 0
+    goal.x = 3
+    goal.y = 0
     sound_intensity = 0
     prev_sound = 0
     curr_sound = 0
@@ -199,6 +232,10 @@ def explore(hear=True,theta_A = 160):
     turn_prob = base_prob # initial turn_prob is same as base_prob
     logheader = 't,ros_t,x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
     pub_log.publish(logheader)
+
+    mlist = []
+    mAvg = 0
+    m = 0
     while not rospy.is_shutdown():# and x < 10 * 60 * 4
         goal_d = np.Inf # initially set goal distance to be infinite to prevent stopping
 
@@ -212,8 +249,8 @@ def explore(hear=True,theta_A = 160):
         if curr_sound > theta_A:
             turn_prob = base_prob
         
-        if curr_sound < theta_A:
-            print(rospy.Time.now().to_sec()-t,'taxis. curr_sound = ',curr_sound,' theta_A = ',theta_A)
+        # if curr_sound < theta_A:
+        #     print(rospy.Time.now().to_sec()-t,'taxis. curr_sound = ',curr_sound,' theta_A = ',theta_A)
         
         x +=1
         bound_check = 3
@@ -315,8 +352,17 @@ def explore(hear=True,theta_A = 160):
             # if avoid_obstacle:
             #     straight = stop
             pub.publish(straight)
-        if rospy.Time.now().to_sec()-t <= expDuration:
-            log = '{},{},{},{},{},{},{},{},{}'.format(time.time(),rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,curr_sound,turn_prob,acTion)
+        # if rospy.Time.now().to_sec()-t <= expDuration:
+        #     mt = get_quality()
+        #     if mt < 0:
+        #         m = mt
+
+        #     mlist.append(m)
+        #     if len(mlist) >= qSize:
+        #         mAvg = np.mean(mlist)
+        #         mlist = []
+
+            log = '{},{},{},{},{},{},{},{},{}'.format(time.time(),rospy.Time.now().to_sec()-t,pose.x,pose.y,yaw,prev_sound,curr_sound,turn_prob,acTion)#,m,mAvg)
             pub_log.publish(log)
             # print 'straight',yaw,drd_heading,rot_vel
         set_p = drd_heading
@@ -337,6 +383,6 @@ if __name__=="__main__":
     
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
-        explore(hear=True,theta_A=190)
+        explore(hear=True,theta_A=180)
     except rospy.ROSInterruptException:
         pass
