@@ -15,22 +15,6 @@ import time
 import numpy as np
 from virtual_wall import virtual_wall
 
-#detour to measure wifi quality
-from subprocess import Popen,PIPE
-mt = 0
-mv = 0
-def get_quality():
-    global mt,mv
-    shell_cmd = 'iwconfig {} | grep Link'.format('wlan0')
-    proc = Popen(shell_cmd,shell=True,stdout=PIPE,stderr=PIPE)
-    output,err = proc.communicate()
-    msg = output.decode('utf-8').strip()
-    m = msg.split('=')[-1]
-    mt = float(m.split(' ')[0])
-    if mt < 0:
-        mv = mt
-
-    return mv
 
 wall = virtual_wall(200,50,True)
 
@@ -42,12 +26,12 @@ linear_vel = 0.1
 angular_vel = 1.77/2
 
 yaw = 0
-base_prob = 0# 1.0/(hz*10)
-prob_multiplier = 6 # probability multiplier
-prob_divisor = 1000
+base_prob = 1.0/(hz*10)
+prob_multiplier = 10 # probability multiplier
+prob_divisor = 10
 sound_intensity_list = [] # list of sound intensity readings
 qSize = 1 # size of queue before updating sound intensity values (size of queue for average filter)
-expDuration = 2000
+expDuration = 600
 new_comm_signal = False
 
 mu = math.pi
@@ -249,9 +233,6 @@ def explore(hear=True,theta_A = 1160):
         if curr_sound > theta_A:
             turn_prob = base_prob
         
-        # if curr_sound < theta_A:
-        #     print(rospy.Time.now().to_sec()-t,'taxis. curr_sound = ',curr_sound,' theta_A = ',theta_A)
-        
         x +=1
         bound_check = 3
         if not turn:
@@ -262,8 +243,7 @@ def explore(hear=True,theta_A = 1160):
                 bumper_event = False
 
             pub_bump.publish('bumper={},avoid={},{},({},{},{})'.format(bound_check,avoid_obstacle,bumpside,pose.x,pose.y,bumpyaw))
-        # if endExperiment:
-        #     print 'end experiment' 
+        
         if rospy.Time.now().to_sec()-t >= expDuration:# and not avoid_obstacle and not turn and False:#not time limited for now
             # Experiment duration reached. Go home.
             if hear:
@@ -383,6 +363,6 @@ if __name__=="__main__":
     
     node = rospy.init_node('my_turtle',anonymous=True)
     try:
-        explore(hear=True,theta_A=180)
+        explore(hear=True,theta_A=18000)
     except rospy.ROSInterruptException:
         pass
