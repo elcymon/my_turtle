@@ -16,11 +16,12 @@ import numpy as np
 from virtual_wall import virtual_wall
 
 class MyTurtle:
-    def __init__(self,poseOffset=(0,0,0),base_prob=0,prob_multiplier=10,
+    def __init__(self,robotID,poseOffset=(0,0,0),base_prob=0,prob_multiplier=10,
                     prob_divisor=10,qSize = 1,velocity=0.1,expDuration=600,
                     goalPose=None,hear=False,theta_A=np.Inf,experimentWaitDuration=0,
                     worldWidth=5,worldLength=5,centredOrigin=True):
         
+        self.robotID = robotID
         self.experimentWaitDuration = experimentWaitDuration
         
         self.wall = virtual_wall(worldWidth,worldLength,centredOrigin)
@@ -205,7 +206,7 @@ class MyTurtle:
 
         sub_odom = rospy.Subscriber('/robot_pose_ekf/odom_combined',PoseWithCovarianceStamped,self.callback_odom,queue_size=1)
         
-        pub_log = rospy.Publisher('/my_turtle/log',String,queue_size=1)
+        pub_log = rospy.Publisher('/log',String,queue_size=1)
         pub_bump = rospy.Publisher('/my_turtle/bump_info',String,queue_size = 1)
         # sub_log = rospy.Subscriber('/my_turtle/log',String,self.callback_log,queue_size=1)
         
@@ -241,7 +242,7 @@ class MyTurtle:
         revStart = None # for holding location reverse motion started
         revD = 0.05 #  reversing distance
         self.turn_prob = self.base_prob # initial self.turn_prob is same as self.base_prob
-        logheader = 'x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
+        logheader = self.robotID + ':x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
         #pause for some  seconds before starting motion
         time.sleep(self.experimentWaitDuration)
         
@@ -361,7 +362,7 @@ class MyTurtle:
                     break
                 
 
-            log = '{},{},{},{},{},{},{}'.format(self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
+            log = '{}:{},{},{},{},{},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
             pub_log.publish(log)
                 # print 'straight',self.yaw,self.drd_heading,rot_vel
             set_p = self.drd_heading
@@ -378,7 +379,7 @@ class MyTurtle:
         print("Quitting")
 
 if __name__=="__main__":
-    
+    robotID = robot1
     # go to goal with 0 turn probability
     # turtle = MyTurtle(poseOffset=(0,0,0),goalPose=(15,0,0),hear=True,qSize=1)
 

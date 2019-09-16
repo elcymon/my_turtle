@@ -17,8 +17,8 @@
     </node>
     <include file="$(find turtlebot_gazebo)/launch/turtlebot_world.launch">
         <arg name="world_file" value="/home/turtlebot/catkin_ws/src/my_turtle/worlds/top_view.world"/>
-        <!-- <arg name="world_file" value="$(find turtlebot_gazebo)/worlds/empty.world"/> -->
     </include>
+    
     <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
         <param name="output_frame" value="odom"/>
         <param name="freq" value="100.0"/>
