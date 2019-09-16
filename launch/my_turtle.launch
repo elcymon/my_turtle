@@ -19,7 +19,7 @@
         <arg name="world_file" value="/home/turtlebot/catkin_ws/src/my_turtle/worlds/top_view.world"/>
     </include>
     
-    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf" required = "true">
         <param name="output_frame" value="odom"/>
         <param name="freq" value="100.0"/>
         <param name="sensor_timeout" value="1.0"/>
