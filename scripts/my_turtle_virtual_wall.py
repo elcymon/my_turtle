@@ -252,6 +252,7 @@ class MyTurtle:
         #log = logheader
         while not self.experimentStart: #busy wait till experiment start is true
             pub_log.publish(logheader)
+            rate.sleep()
         
         
         # mlist = []
