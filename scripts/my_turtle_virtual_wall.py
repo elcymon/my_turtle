@@ -212,7 +212,7 @@ class MyTurtle:
         
         pub_bump = rospy.Publisher('/{}/my_turtle/bump_info'.format(self.robotID),String,queue_size = 1)
         sub_experimentStart = rospy.Subscriber('/experimentStart',Bool,self.callback_experimentStart,queue_size=1)
-        pub_log = rospy.Publisher('/{}/log'.format(self.robotID),String,queue_size=1)
+        pub_log = rospy.Publisher('/{}/log'.format(self.robotID),String,queue_size=5)
         # sub_log = rospy.Subscriber('/my_turtle/log',String,self.callback_log,queue_size=1)
         
         rate = rospy.Rate(self.hz) #looping rate
@@ -251,10 +251,11 @@ class MyTurtle:
         time.sleep(self.experimentWaitDuration)
         #log = logheader
         logTime = rospy.Time.now().to_sec()
-        if rospy.Time.now().to_sec() - logTime > 0.5:
-            pub_log.publish(logheader)
-            logTime = rospy.Time.now().to_sec()
-            
+        while not self.experimentStart: #busy wait till experiment start is true
+            if rospy.Time.now().to_sec() - logTime > 0.5:
+                pub_log.publish(logheader)
+                logTime = rospy.Time.now().to_sec()
+                
         
         
         # mlist = []
