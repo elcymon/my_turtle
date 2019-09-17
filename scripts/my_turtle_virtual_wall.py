@@ -212,8 +212,9 @@ class MyTurtle:
 
         sub_odom = rospy.Subscriber('/{}/robot_pose_ekf/odom_combined'.format(self.robotID),PoseWithCovarianceStamped,self.callback_odom,queue_size=1)
         
-        pub_log = rospy.Publisher('/log',String,queue_size=1)
         pub_bump = rospy.Publisher('/{}/my_turtle/bump_info'.format(self.robotID),String,queue_size = 1)
+        sub_experimentStart = rospy.Subscriber('/experimentStart',Bool,self.callback_experimentStart,queue_size=1)
+        pub_log = rospy.Publisher('/log',String,queue_size=1)
         # sub_log = rospy.Subscriber('/my_turtle/log',String,self.callback_log,queue_size=1)
         
         rate = rospy.Rate(self.hz) #looping rate
