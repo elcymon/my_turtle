@@ -250,9 +250,12 @@ class MyTurtle:
         #pause for some  seconds before starting motion
         time.sleep(self.experimentWaitDuration)
         #log = logheader
+        logTime = rospy.Time.now().to_sec()
         while not self.experimentStart: #busy wait till experiment start is true
-            pub_log.publish(logheader)
-            rate.sleep()
+            if rospy.Time.now().to_sec() - logTime > 0.5:
+                pub_log.publish(logheader)
+                logTime = rospy.Time.now().to_sec()
+                
         
         
         # mlist = []
@@ -261,6 +264,7 @@ class MyTurtle:
         if self.ear != None:
             self.ear.stream_start()
         t = rospy.Time.now().to_sec()
+        
         while not rospy.is_shutdown():# and x < 10 * 60 * 4
             self.goal_d = np.Inf # initially set self.goal distance to be infinite to prevent stopping
 
@@ -382,7 +386,9 @@ class MyTurtle:
             pub_hdg_state.publish(state_p)
             # print(self.yaw)        
             log = '{}:{},{},{},{},{},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
-            pub_log.publish(log)
+            if rospy.Time.now().to_sec() - logTime > 0.5:
+                pub_log.publish(log)
+                logTime = rospy.Time.now().to_sec()
             rospy.loginfo(log)
             
             rate.sleep()
