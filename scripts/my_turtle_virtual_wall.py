@@ -243,7 +243,6 @@ class MyTurtle:
         prev_sound = 0
         curr_sound = 0
 
-        t = rospy.Time.now().to_sec()
         first_sound = True
         revStart = None # for holding location reverse motion started
         revD = 0.05 #  reversing distance
@@ -251,6 +250,7 @@ class MyTurtle:
         logheader = self.robotID + ':t,x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
         #pause for some  seconds before starting motion
         time.sleep(self.experimentWaitDuration)
+        #log = logheader
         while not self.experimentStart: #busy wait till experiment start is true
             pub_log.publish(logheader)
         
@@ -258,7 +258,7 @@ class MyTurtle:
         # mlist = []
         # mAvg = 0
         # m = 0
-        log = logheader
+        t = rospy.Time.now().to_sec()
         while not rospy.is_shutdown():# and x < 10 * 60 * 4
             self.goal_d = np.Inf # initially set self.goal distance to be infinite to prevent stopping
 
