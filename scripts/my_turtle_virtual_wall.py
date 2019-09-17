@@ -199,9 +199,7 @@ class MyTurtle:
 
     def explore(self):
 
-        if self.ear != None:
-            self.ear.stream_start()
-
+        
         pub = rospy.Publisher('/{}mobile_base/commands/velocity'.format(self.robotID), Twist,queue_size=1)
         pub_hdg_setpoint = rospy.Publisher('/{}/hdg/setpoint'.format(self.robotID),Float64,queue_size=1)
         pub_hdg_state = rospy.Publisher('/{}/hdg/state'.format(self.robotID),Float64,queue_size=1)
@@ -259,6 +257,8 @@ class MyTurtle:
         # mlist = []
         # mAvg = 0
         # m = 0
+        if self.ear != None:
+            self.ear.stream_start()
         t = rospy.Time.now().to_sec()
         while not rospy.is_shutdown():# and x < 10 * 60 * 4
             self.goal_d = np.Inf # initially set self.goal distance to be infinite to prevent stopping
