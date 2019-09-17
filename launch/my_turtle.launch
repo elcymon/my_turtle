@@ -1,9 +1,11 @@
 <launch>
+    <arg name="id" />
+    <arg name="robot_args" />
     <!-- <include file="$(find turtlebot_bringup)/launch/minimal.launch">
     </include> -->
-    <node pkg="my_turtle" type="my_turtle_virtual_wall.py" name="my_turtle" output="screen" required="true">
+    <node pkg="my_turtle" type="my_turtle_virtual_wall.py" name="my_turtle" output="screen" required="true" machine="$(arg id)" args="$(arg robot_args)" ns="$(arg id)">
     </node>
-    <node ns="hdg" name="hdg_pid" pkg="pid" type="controller" output="screen" required="true">
+    <node ns="$(arg id)/hdg" name="hdg_pid" pkg="pid" type="controller" output="screen" required="true" machine="$(arg id)">
             <param name="Kp" value="10000.0" />
             <param name="Ki" value="000.0" />
             <param name="Kd" value="0.0"/>
@@ -15,11 +17,11 @@
             <param name="min_loop_frequency" value="1.0"/>
             <param name="angle_wrap" value="6.283185307179586" />
     </node>
-    <include file="$(find turtlebot_gazebo)/launch/turtlebot_world.launch">
+    <!-- <include file="$(find turtlebot_gazebo)/launch/turtlebot_world.launch">
         <arg name="world_file" value="/home/turtlebot/catkin_ws/src/my_turtle/worlds/top_view.world"/>
     </include>
-    
-    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf" required = "true">
+     -->
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf" required = "true" machine="$(arg id)" ns="$(arg id)">
         <param name="output_frame" value="odom"/>
         <param name="freq" value="100.0"/>
         <param name="sensor_timeout" value="1.0"/>

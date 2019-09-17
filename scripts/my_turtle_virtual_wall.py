@@ -3,7 +3,7 @@ import rospy
 import angles
 from geometry_msgs.msg import Twist,Point,PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float64,String
+from std_msgs.msg import Float64,String, Bool
 from sensor_msgs.msg import Imu
 from kobuki_msgs.msg import BumperEvent
 from tf.transformations import euler_from_quaternion
@@ -14,16 +14,19 @@ import SWHear
 import time
 import numpy as np
 from virtual_wall import virtual_wall
+import sys
 
 class MyTurtle:
     def __init__(self,robotID,poseOffset=(0,0,0),base_prob=0,prob_multiplier=10,
                     prob_divisor=10,qSize = 1,velocity=0.1,expDuration=600,
                     goalPose=None,hear=False,theta_A=np.Inf,experimentWaitDuration=0,
                     worldWidth=5,worldLength=5,centredOrigin=True):
-        
+        print(robotID,poseOffset,base_prob,prob_divisor,prob_multiplier,qSize,velocity,expDuration,
+                goalPose,hear,theta_A,experimentWaitDuration,worldLength,worldWidth,centredOrigin)
         self.robotID = robotID
         self.experimentWaitDuration = experimentWaitDuration
-        
+        self.experimentStart = False
+
         self.wall = virtual_wall(worldWidth,worldLength,centredOrigin)
 
         self.hz = 40
@@ -80,7 +83,10 @@ class MyTurtle:
 
         # self.pose = Odometry()
         self.pkg_path = '/home/turtlebot/catkin_ws/src/my_turtle'
-
+    
+    def callback_experimentStart(self,data):
+        self.experimentStart = data.data
+    
     def callback_imu(self,data):
 
         quaternion = (data.orientation.x,
@@ -196,18 +202,18 @@ class MyTurtle:
         if self.ear != None:
             self.ear.stream_start()
 
-        pub = rospy.Publisher('mobile_base/commands/velocity', Twist,queue_size=1)
-        pub_hdg_setpoint = rospy.Publisher('/hdg/setpoint',Float64,queue_size=1)
-        pub_hdg_state = rospy.Publisher('/hdg/state',Float64,queue_size=1)
+        pub = rospy.Publisher('/{}mobile_base/commands/velocity'.format(self.robotID), Twist,queue_size=1)
+        pub_hdg_setpoint = rospy.Publisher('/{}/hdg/setpoint'.format(self.robotID),Float64,queue_size=1)
+        pub_hdg_state = rospy.Publisher('/{}/hdg/state'.format(self.robotID),Float64,queue_size=1)
 
-        sub_imu = rospy.Subscriber('/mobile_base/sensors/imu_data',Imu,self.callback_imu,queue_size=1)
-        sub_bumper = rospy.Subscriber('/mobile_base/events/bumper',BumperEvent,self.callback_bumper,queue_size=1)
-        sub_hdg_pid = rospy.Subscriber('/hdg/control_effort',Float64,self.callback_hdg_pid,queue_size=1)
+        sub_imu = rospy.Subscriber('/{}/mobile_base/sensors/imu_data'.format(self.robotID),Imu,self.callback_imu,queue_size=1)
+        sub_bumper = rospy.Subscriber('/{}/mobile_base/events/bumper'.format(self.robotID),BumperEvent,self.callback_bumper,queue_size=1)
+        sub_hdg_pid = rospy.Subscriber('/{}/hdg/control_effort'.format(self.robotID),Float64,self.callback_hdg_pid,queue_size=1)
 
-        sub_odom = rospy.Subscriber('/robot_pose_ekf/odom_combined',PoseWithCovarianceStamped,self.callback_odom,queue_size=1)
+        sub_odom = rospy.Subscriber('/{}/robot_pose_ekf/odom_combined'.format(self.robotID),PoseWithCovarianceStamped,self.callback_odom,queue_size=1)
         
         pub_log = rospy.Publisher('/log',String,queue_size=1)
-        pub_bump = rospy.Publisher('/my_turtle/bump_info',String,queue_size = 1)
+        pub_bump = rospy.Publisher('/{}/my_turtle/bump_info'.format(self.robotID),String,queue_size = 1)
         # sub_log = rospy.Subscriber('/my_turtle/log',String,self.callback_log,queue_size=1)
         
         rate = rospy.Rate(self.hz) #looping rate
@@ -242,18 +248,18 @@ class MyTurtle:
         revStart = None # for holding location reverse motion started
         revD = 0.05 #  reversing distance
         self.turn_prob = self.base_prob # initial self.turn_prob is same as self.base_prob
-        logheader = self.robotID + ':x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
+        logheader = self.robotID + ':t,x,y,yaw,prev_sound,curr_sound,turn_prob,acTion'
         #pause for some  seconds before starting motion
         time.sleep(self.experimentWaitDuration)
+        while not self.experimentStart: #busy wait till experiment start is true
+            pub_log.publish(logheader)
         
-        pub_log.publish(logheader)
-
+        
         # mlist = []
         # mAvg = 0
         # m = 0
         log = logheader
         while not rospy.is_shutdown():# and x < 10 * 60 * 4
-            rospy.loginfo(log)
             self.goal_d = np.Inf # initially set self.goal distance to be infinite to prevent stopping
 
             if self.ear != None:
@@ -362,8 +368,6 @@ class MyTurtle:
                     break
                 
 
-            log = '{}:{},{},{},{},{},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
-            pub_log.publish(log)
                 # print 'straight',self.yaw,self.drd_heading,rot_vel
             set_p = self.drd_heading
             state_p = self.yaw
@@ -375,11 +379,45 @@ class MyTurtle:
             pub_hdg_setpoint.publish(set_p)
             pub_hdg_state.publish(state_p)
             # print(self.yaw)        
+            log = '{}:{},{},{},{},{},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
+            pub_log.publish(log)
+            rospy.loginfo(log)
+            
             rate.sleep()
         print("Quitting")
 
 if __name__=="__main__":
-    robotID = robot1
+    robotID = sys.argv[1]
+    poseOffset=eval(sys.argv[2])
+    base_prob=eval(sys.argv[3])
+    prob_multiplier=eval(sys.argv[4])
+    prob_divisor=eval(sys.argv[5])
+    qSize=eval(sys.argv[6])
+    velocity=eval(sys.argv[7])
+    expDuration=eval(sys.argv[8])
+    goalPose=eval(sys.argv[9])
+    hear=eval(sys.argv[10])
+    theta_A=eval(sys.argv[11])
+    experimentWaitDuration=eval(sys.argv[12])
+    worldWidth=eval(sys.argv[13])
+    worldLength=eval(sys.argv[14])
+    centredOrigin=eval(sys.argv[15])
+    
+    turtle = MyTurtle(robotID=robotID,
+                    poseOffset=poseOffset,
+                    base_prob=base_prob,
+                    prob_multiplier=prob_multiplier,
+                    prob_divisor=prob_divisor,
+                    qSize=qSize,
+                    velocity=velocity,
+                    expDuration=expDuration,
+                    goalPose=goalPose,
+                    hear=hear,
+                    theta_A=theta_A,
+                    experimentWaitDuration=experimentWaitDuration,
+                    worldWidth=worldWidth,
+                    worldLength=worldLength,
+                    centredOrigin=centredOrigin)
     # go to goal with 0 turn probability
     # turtle = MyTurtle(poseOffset=(0,0,0),goalPose=(15,0,0),hear=True,qSize=1)
 
