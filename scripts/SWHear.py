@@ -113,7 +113,7 @@ class SWHear():
 
     def initiate(self):
         """run this after changing settings (like rate) before recording"""
-        device = 2
+        device = 0
         if self.device is None:
             self.device=self.valid_input_devices()[device] #pick the first one
         if self.rate is None:
