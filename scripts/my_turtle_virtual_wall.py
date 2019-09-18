@@ -385,7 +385,7 @@ class MyTurtle:
             pub_hdg_setpoint.publish(set_p)
             pub_hdg_state.publish(state_p)
             # print(self.yaw)        
-            log = '{}:{},{},{},{},{},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
+            log = '{}:{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
             if rospy.Time.now().to_sec() - logTime > 0.5:
                 pub_log.publish(log)
                 logTime = rospy.Time.now().to_sec()
