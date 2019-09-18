@@ -269,7 +269,7 @@ class MyTurtle:
             self.goal_d = np.Inf # initially set self.goal distance to be infinite to prevent stopping
 
             if self.ear != None:
-                self.turn_prob,prev_sound,curr_sound = computeGrad(self.turn_prob,prev_sound,curr_sound,self.turn)#last values of soundIntensity and self.turn_prob
+                self.turn_prob,prev_sound,curr_sound = self.computeGrad(self.turn_prob,prev_sound,curr_sound,self.turn)#last values of soundIntensity and self.turn_prob
                 #chemotaxis should only be activated when sound intensity is below a threshold
                 if curr_sound > self.theta_A:
                     self.turn_prob = self.base_prob

@@ -1,11 +1,32 @@
 <launch>
-    <arg name="id" />
-    <arg name="robot_args" />
-    <!-- <include file="$(find turtlebot_bringup)/launch/minimal.launch">
-    </include> -->
-    <node pkg="my_turtle" type="my_turtle_virtual_wall.py" name="my_turtle" output="screen" required="true" machine="$(arg id)" args="$(arg robot_args)" ns="$(arg id)">
+    <arg name="experimentWaitDuration" value="1" />
+    <arg name="expDuration" value="600" />
+    <arg name="hear" value="True" />
+    
+    <arg name="robot1" value="robot1" />
+    
+    <arg name="poseOffset" value="(0,0,0)" />
+    <arg name="base_prob" value="0.0025" />
+    <arg name="prob_multiplier" value="1" />
+    <arg name="prob_divisor" value="1" />
+    <arg name="qSize" value="40" />
+    <arg name="velocity" value="0.1" />
+    <arg name="goalPose" value="(0,0,0)" />
+    <arg name="theta_A" value="10000" />
+    <arg name="worldWidth" value="4" />
+    <arg name="worldLength" value="4" />
+    <arg name="centredOrigin" value="True" />
+    <arg name="robot_args_data" value="$(arg poseOffset) $(arg base_prob) $(arg prob_multiplier) $(arg prob_divisor) $(arg qSize) $(arg velocity) $(arg expDuration) $(arg goalPose) $(arg hear) $(arg theta_A) $(arg experimentWaitDuration) $(arg worldWidth) $(arg worldLength) $(arg centredOrigin)" />
+
+    <arg name="id"  value="$(arg robot1)"/>
+    <arg name="robot_args" value="$(arg robot1) $(arg robot_args_data)" />
+
+    <include file="$(find turtlebot_bringup)/launch/minimal.launch" ns="$(arg id)">
+    </include>
+    
+    <node pkg="my_turtle" type="my_turtle_virtual_wall.py" name="my_turtle" output="screen" required="true" args="$(arg robot_args)" ns="$(arg id)">
     </node>
-    <node ns="$(arg id)/hdg" name="hdg_pid" pkg="pid" type="controller" output="screen" required="true" machine="$(arg id)">
+    <node ns="$(arg id)/hdg" name="hdg_pid" pkg="pid" type="controller" output="screen" required="true">
             <param name="Kp" value="10000.0" />
             <param name="Ki" value="000.0" />
             <param name="Kd" value="0.0"/>
@@ -21,7 +42,7 @@
         <arg name="world_file" value="/home/turtlebot/catkin_ws/src/my_turtle/worlds/top_view.world"/>
     </include>
      -->
-    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf" required = "true" machine="$(arg id)" ns="$(arg id)">
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf" required = "true" ns="$(arg id)">
         <param name="output_frame" value="odom"/>
         <param name="freq" value="100.0"/>
         <param name="sensor_timeout" value="1.0"/>
