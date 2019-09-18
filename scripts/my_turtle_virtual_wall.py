@@ -39,7 +39,7 @@ class MyTurtle:
         
         random.seed(int(time.time()/(1 + poseOffset[0])))#set random seed to current time and based on self.pose
         self.linear_vel = velocity
-        self.angular_vel = velocity / 1.77 # half of 0.354 diameter
+        self.angular_vel = velocity #/ 1.77 # half of 0.354 diameter
 
         self.poseOffset = poseOffset
 
@@ -53,7 +53,7 @@ class MyTurtle:
 
         self.mu = math.pi
         self.sigma = math.pi/2.0
-        self.tolerance = 5 * math.pi / 180
+        self.tolerance = 10 * math.pi / 180
 
         self.new_heading = 'NaN'
         self.turn_amt = 0
