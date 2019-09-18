@@ -200,7 +200,7 @@ class MyTurtle:
     def explore(self):
 
         
-        pub = rospy.Publisher('/{}mobile_base/commands/velocity'.format(self.robotID), Twist,queue_size=1)
+        pub = rospy.Publisher('/{}/mobile_base/commands/velocity'.format(self.robotID), Twist,queue_size=1)
         pub_hdg_setpoint = rospy.Publisher('/{}/hdg/setpoint'.format(self.robotID),Float64,queue_size=1)
         pub_hdg_state = rospy.Publisher('/{}/hdg/state'.format(self.robotID),Float64,queue_size=1)
 
