@@ -39,7 +39,7 @@ class MyTurtle:
         
         random.seed(int(time.time()/(1 + poseOffset[0])))#set random seed to current time and based on self.pose
         self.linear_vel = velocity
-        self.angular_vel = velocity #/ 1.77 # half of 0.354 diameter
+        self.angular_vel = velocity * 2 #/ 1.77 # half of 0.354 diameter
 
         self.poseOffset = poseOffset
 
@@ -361,7 +361,7 @@ class MyTurtle:
                 pub.publish(straight)
             else:
                 #t_amt = self.turnToGoalYaw()
-                if self.goal_d <= 0.1 and abs(t_amt) < self.tolerance:
+                if self.goal_d <= 0.1 and abs(t_amt) < self.tolerance and rospy.Time.now().to_sec()-t >= self.expDuration:
                     acTion = 'stop'
                     #stop if self.goal (i.e. self.home in go self.home behaviour) is reached
                     pub.publish(stop)
