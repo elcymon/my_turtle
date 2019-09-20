@@ -161,7 +161,6 @@ class MyTurtle:
 
             
         if not self.turn and self.new_comm_signal:
-            self.new_comm_signal = False
             self.turn_prob = self.base_prob
             if prev_sound > curr_sound:
                 #increase self.turn probability to change orientation
@@ -172,8 +171,7 @@ class MyTurtle:
             else:
                 #leave self.turn probability as is
                 self.turn_prob = self.turn_prob
-            prev_sound = curr_sound # update sound intensity value
-
+            
         #curr_sound = sound_intensity
 
         return self.turn_prob,prev_sound,curr_sound
@@ -250,11 +248,9 @@ class MyTurtle:
         #pause for some  seconds before starting motion
         time.sleep(self.experimentWaitDuration)
         #log = logheader
-        logTime = rospy.Time.now().to_sec()
         while not self.experimentStart: #busy wait till experiment start is true
-            if rospy.Time.now().to_sec() - logTime > 0.5:
-                pub_log.publish(logheader)
-                logTime = rospy.Time.now().to_sec()
+            pub_log.publish(logheader)
+            rate.sleep()
                 
         
         
@@ -289,12 +285,10 @@ class MyTurtle:
                 pub_bump.publish('bumper={},avoid={},{},({},{},{})'.format(bound_check,self.avoid_obstacle,bumpside,self.pose.x,self.pose.y,bumpyaw))
             
             if self.goal != None and self.base_prob == 0:#if goal directed behaviour, go toward goal
-                    t_amt = self.goToGoal()
+                t_amt = self.goToGoal()
             
             elif rospy.Time.now().to_sec()-t >= self.expDuration:# if time limited experiment
                 # Experiment duration reached. Go self.home.
-                if self.ear != None:
-                    self.ear.close()
                 if self.goal == None:#if goal is not to return to a specific goal pose
                     break
                 else:
@@ -371,6 +365,7 @@ class MyTurtle:
                     acTion = 'stop'
                     #stop if self.goal (i.e. self.home in go self.home behaviour) is reached
                     pub.publish(stop)
+                    
                     break
                 
 
@@ -386,12 +381,16 @@ class MyTurtle:
             pub_hdg_state.publish(state_p)
             # print(self.yaw)        
             log = '{}:{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{},{}'.format(self.robotID,self.pose.x,self.pose.y,self.yaw,prev_sound,curr_sound,self.turn_prob,acTion)#,m,mAvg)
-            if rospy.Time.now().to_sec() - logTime > 0.5:
-                pub_log.publish(log)
-                logTime = rospy.Time.now().to_sec()
+            pub_log.publish(log)
+            
+            if self.new_comm_signal:
+                prev_sound = curr_sound # update sound intensity value
+                self.new_comm_signal = False
             rospy.loginfo(log)
             
             rate.sleep()
+        if self.ear != None:
+            self.ear.close()
         print("Quitting")
 
 if __name__=="__main__":
