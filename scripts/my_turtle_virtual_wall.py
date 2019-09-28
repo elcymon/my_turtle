@@ -30,7 +30,8 @@ class MyTurtle:
         self.wall = virtual_wall(worldWidth,worldLength,centredOrigin)
 
         self.hz = 40
-        if hear:
+        self.hear = hear
+        if self.hear is not None:
             self.ear = SWHear.SWHear(rate=44100,updatesPerSecond=self.hz)
         else:
             self.ear = None
@@ -131,8 +132,12 @@ class MyTurtle:
         ''' reads the sound signal from microphone and update the robot's self.turning probability
         reself.turns the new self.turning probability and the sound intensity measured'''
 
-        if not self.ear.data is None and not self.ear.fft is None:
-            aa = self.ear.fft
+        if (not self.ear.data is None) and (not self.ear.fft is None) and (self.ear is not None):
+            if self.hear == 'white':
+                aa = self.ear.fft
+            else:
+                aa = self.ear.fft
+                aa = aa[(aa >= (self.hear - 30)) & (aa <= (self.hear + 30))]
 
             sound_intensity = np.mean(aa) # update intensity of sound increased from last time step
             #if sound_intensity < 300:
@@ -403,7 +408,12 @@ if __name__=="__main__":
     velocity=eval(sys.argv[7])
     expDuration=eval(sys.argv[8])
     goalPose=eval(sys.argv[9])
-    hear=eval(sys.argv[10])
+    
+    if 'white' == sys.argv[10]:
+        hear = sys.argv[10]
+    else:
+        hear=eval(sys.argv[10])
+
     theta_A=eval(sys.argv[11])
     experimentWaitDuration=eval(sys.argv[12])
     worldWidth=eval(sys.argv[13])
