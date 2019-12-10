@@ -4,6 +4,6 @@
 */*.pyc
 *.wav
 results/*
-
+*.log
 *.zip
 !.placeholder
